@@ -11,38 +11,71 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  RegisterBody,
-  RegisterBodyType,
-} from "@/schemaValidations/auth.schema";
+import { LoginBody, LoginBodyType } from "@/schemaValidations/auth.schema";
 import envConfig from "@/configs/config";
+import { useToast } from "@/hooks/use-toast";
 
-export default function RegisterForm() {
+export default function LoginForm() {
+  const { toast } = useToast();
+
   // 1. Define your form.
-  const form = useForm<RegisterBodyType>({
-    resolver: zodResolver(RegisterBody),
+  const form = useForm<LoginBodyType>({
+    resolver: zodResolver(LoginBody),
     defaultValues: {
       email: "",
-      name: "",
       password: "",
-      confirmPassword: "",
     },
   });
 
   // 2. Define a submit handler.
-  async function onSubmit(values: RegisterBodyType) {
-    const result = await fetch(
-      `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/register`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      }
-    ).then((res) => res.json());
+  async function onSubmit(values: LoginBodyType) {
+    try {
+      const result = await fetch(
+        `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        }
+      ).then(async (res) => {
+        const payload = await res.json();
+        const data = {
+          status: res.status,
+          payload,
+        };
+        if (!res.ok) {
+          throw data;
+        }
+        return data;
+      });
+      toast({
+        description: result.payload.message,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      const errors = error.payload?.errors as {
+        field: string;
+        message: string;
+      }[];
+      const status = error.status as number;
 
-    console.log(result);
+      if (status === 422) {
+        errors.forEach((err) => {
+          form.setError(err.field as "email" | "password", {
+            type: "server",
+            message: err.message,
+          });
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: error.payload.message,
+        });
+      }
+    }
   }
 
   return (
@@ -67,19 +100,6 @@ export default function RegisterForm() {
         />
         <FormField
           control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tên</FormLabel>
-              <FormControl>
-                <Input placeholder="Enter your name" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
           name="password"
           render={({ field }) => (
             <FormItem>
@@ -95,25 +115,8 @@ export default function RegisterForm() {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="confirmPassword"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Confirm your password"
-                  type="password"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <Button className="!mt-4 w-full" type="submit">
-          Đăng ký
+          Đăng nhập
         </Button>
       </form>
     </Form>
