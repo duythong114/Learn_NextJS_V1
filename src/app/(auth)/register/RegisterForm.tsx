@@ -16,8 +16,11 @@ import {
   RegisterBodyType,
 } from "@/schemaValidations/auth.schema";
 import envConfig from "@/configs/config";
+import { useToast } from "@/hooks/use-toast";
 
 export default function RegisterForm() {
+  const { toast } = useToast();
+
   // 1. Define your form.
   const form = useForm<RegisterBodyType>({
     resolver: zodResolver(RegisterBody),
@@ -31,18 +34,59 @@ export default function RegisterForm() {
 
   // 2. Define a submit handler.
   async function onSubmit(values: RegisterBodyType) {
-    const result = await fetch(
-      `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/register`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      }
-    ).then((res) => res.json());
+    let result;
+    try {
+      const res = await fetch(
+        `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/register`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        }
+      );
+      result = await handleResponse(res);
+      toast({
+        description: result.payload.message,
+      });
 
-    console.log(result);
+      console.log(result);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      const errors = error.payload?.errors as {
+        field: string;
+        message: string;
+      }[];
+      const status = error.status as number;
+
+      if (status === 422) {
+        errors.forEach((err) => {
+          form.setError(
+            err.field as "name" | "email" | "password" | "confirmPassword",
+            {
+              type: "server",
+              message: err.message,
+            }
+          );
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: error.payload.message,
+        });
+      }
+    }
+  }
+
+  async function handleResponse(res: Response) {
+    const payload = await res.json();
+    const data = { status: res.status, payload };
+    if (!res.ok) {
+      throw data;
+    }
+    return data;
   }
 
   return (

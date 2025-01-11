@@ -29,8 +29,9 @@ export default function LoginForm() {
 
   // 2. Define a submit handler.
   async function onSubmit(values: LoginBodyType) {
+    let result;
     try {
-      const result = await fetch(
+      const res = await fetch(
         `${envConfig.NEXT_PUBLIC_API_ENDPOINT}/auth/login`,
         {
           method: "POST",
@@ -39,17 +40,8 @@ export default function LoginForm() {
           },
           body: JSON.stringify(values),
         }
-      ).then(async (res) => {
-        const payload = await res.json();
-        const data = {
-          status: res.status,
-          payload,
-        };
-        if (!res.ok) {
-          throw data;
-        }
-        return data;
-      });
+      );
+      result = await handleResponse(res);
       toast({
         description: result.payload.message,
       });
@@ -76,6 +68,15 @@ export default function LoginForm() {
         });
       }
     }
+  }
+
+  async function handleResponse(res: Response) {
+    const payload = await res.json();
+    const data = { status: res.status, payload };
+    if (!res.ok) {
+      throw data;
+    }
+    return data;
   }
 
   return (
